@@ -21,38 +21,44 @@ MONTHS = [
     "2026-01",
 ]
 
-
+# Fungsi untuk menginjeksi data per bulan
 def ingest_month(con: duckdb.DuckDBPyConnection, month: str):
     filename = f"yellow_tripdata_{month}.parquet"
     dest     = RAW_TLC_DIR / filename
     url      = f"{BASE_URL}/{filename}"
 
-    if dest.exists():
+    # FIX 1: cek exists DAN ukurannya > 1MB (bukan file kosong)
+    if dest.exists() and dest.stat().st_size > 1_000_000:
         size_mb = dest.stat().st_size / (1024 * 1024)
         print(f"[SKIP] {filename} already exists ({size_mb:.1f} MB)")
         return
 
     print(f"[INGEST] {url}")
-    con.execute(f"""
-        COPY (
-            SELECT
-                tpep_pickup_datetime,
-                tpep_dropoff_datetime,
-                passenger_count,
-                trip_distance,
-                PULocationID,
-                DOLocationID,
-                payment_type,
-                fare_amount,
-                tip_amount,
-                total_amount
-            FROM read_parquet('{url}')
-        ) TO '{dest}' (FORMAT PARQUET)
-    """)
-
-    row_count = con.execute(f"SELECT COUNT(*) FROM read_parquet('{dest}')").fetchone()[0]
-    size_mb   = dest.stat().st_size / (1024 * 1024)
-    print(f"[DONE] {filename} — {row_count:,} rows, {size_mb:.1f} MB")
+    try:
+        con.execute(f"""
+            COPY (
+                SELECT
+                    tpep_pickup_datetime,
+                    tpep_dropoff_datetime,
+                    passenger_count,
+                    trip_distance,
+                    PULocationID,
+                    DOLocationID,
+                    payment_type,
+                    fare_amount,
+                    tip_amount,
+                    total_amount
+                FROM read_parquet('{url}')
+            ) TO '{dest}' (FORMAT PARQUET)
+        """)
+        row_count = con.execute(f"SELECT COUNT(*) FROM read_parquet('{dest}')").fetchone()[0]
+        size_mb   = dest.stat().st_size / (1024 * 1024)
+        print(f"[DONE] {filename} — {row_count:,} rows, {size_mb:.1f} MB")
+    # FIX 2: kalau gagal (403/file corrupt), skip bulan itu dan lanjut
+    except Exception as e:
+        print(f"[WARN] {filename} gagal diambil, skip. ({e})")
+        if dest.exists():
+            dest.unlink()  # hapus file corrupt
 
 
 def run_ingestion():
@@ -65,12 +71,19 @@ def run_ingestion():
     for month in MONTHS:
         ingest_month(con, month)
 
+    # FIX 3: hanya baca file yang valid (> 1MB)
+    valid_files = list(RAW_TLC_DIR.glob("*.parquet"))
+    valid_files = [f for f in valid_files if f.stat().st_size > 1_000_000]
+    
+    if not valid_files:
+        raise Exception("Tidak ada file parquet yang valid!")
+    
+    file_list = ", ".join(f"'{f}'" for f in valid_files)
     total = con.execute(
-        f"SELECT COUNT(*) FROM read_parquet('{RAW_TLC_DIR}/*.parquet')"
+        f"SELECT COUNT(*) FROM read_parquet([{file_list}])"
     ).fetchone()[0]
     print(f"[DONE] All months ingested. Total rows: {total:,}")
     con.close()
-
 
 if __name__ == "__main__":
     run_ingestion()

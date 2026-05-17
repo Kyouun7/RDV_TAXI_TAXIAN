@@ -1,7 +1,7 @@
 # Data Engineer Pipeline
 **NYC Taxi Customer Behavior Segmentation — Kelompok 1**
 
-Pipeline ini membaca data NYC Yellow Taxi langsung dari URL, membersihkan, mentransformasi, dan menyimpan data yang siap digunakan untuk analisis dan machine learning.
+Pipeline ini membaca data NYC Yellow Taxi langsung dari URL, mengambil data cuaca historis dari Open-Meteo, membersihkan, mentransformasi, dan menyimpan data yang siap digunakan untuk analisis dan machine learning.
 
 ---
 
@@ -26,10 +26,11 @@ Pipeline berjalan otomatis dari awal sampai akhir. Tidak perlu download data man
 ```
 [1]  INGEST    Baca 5 bulan data Yellow Taxi langsung dari URL NYC TLC
 [1b] ZONES     Download zona lookup + shapefile/GeoJSON untuk peta
+[1c] WEATHER   Fetch data cuaca per jam dari Open-Meteo API (Sept 2025 – Jan 2026)
 [2]  CLEAN     Hapus anomali data (null, tarif negatif, koordinat invalid)
 [3]  TRANSFORM Tambah kolom turunan + decode nama zona
-[4]  BLEND     Gabung dengan data cuaca (opsional, skip jika tidak ada)
-[5]  MODEL     Buat tabel dim_zones + fact_trips (star schema)
+[4]  BLEND     Gabung taxi + cuaca berdasarkan jam penjemputan
+[5]  MODEL     Buat tabel dim_zones + fact_trips + fact_trips_with_weather
 ```
 
 Output pipeline terlihat seperti ini:
@@ -39,8 +40,11 @@ Output pipeline terlihat seperti ini:
 [DONE] yellow_tripdata_2025-11.parquet — 4,181,444 rows, 77.0 MB
 [DONE] yellow_tripdata_2025-12.parquet — 4,305,006 rows, 79.7 MB
 [DONE] yellow_tripdata_2026-01.parquet — 3,724,889 rows, 68.8 MB
+[DONE] Weather data saved: nyc_weather_hourly.parquet (3,672 rows)
 [INFO] Clean row count: 14,558,244 (removed 30.3% anomalies)
+[INFO] Blended rows: 14,558,244
 [DONE] fact_trips: 14,558,244 rows saved.
+[DONE] fact_trips_with_weather: 14,558,244 rows saved.
 ```
 
 ---
@@ -56,17 +60,24 @@ data/
 │   │   ├── yellow_tripdata_2025-11.parquet   (77 MB)
 │   │   ├── yellow_tripdata_2025-12.parquet   (80 MB)
 │   │   └── yellow_tripdata_2026-01.parquet   (69 MB)
+│   ├── weather/
+│   │   └── nyc_weather_hourly.parquet        ← cuaca per jam NYC
 │   └── zones/
 │       ├── taxi_zone_lookup.csv              (265 zona NYC)
 │       └── taxi_zones.geojson                ← untuk peta dashboard
 └── intermediate/
-    ├── tlc_cleaned.parquet      (267 MB) ← setelah cleaning
-    ├── tlc_transformed.parquet  (380 MB) ← setelah feature engineering
-    ├── dim_zones.parquet                 ← tabel dimensi zona
-    └── fact_trips.parquet       (410 MB) ← TABEL UTAMA, siap pakai
+    ├── tlc_cleaned.parquet                   ← setelah cleaning
+    ├── tlc_transformed.parquet               ← setelah feature engineering
+    ├── tlc_with_weather.parquet              ← setelah blend taxi + cuaca
+    ├── dim_zones.parquet                     ← tabel dimensi zona
+    ├── fact_trips.parquet                    ← TAXI ONLY (baseline)
+    └── fact_trips_with_weather.parquet       ← TAXI + CUACA (perbandingan)
 ```
 
-> **File yang dibutuhkan tim lain: `fact_trips.parquet` dan `taxi_zones.geojson`**
+> **File yang dibutuhkan tim lain:**
+> - `fact_trips.parquet` — analisis & ML tanpa cuaca (baseline)
+> - `fact_trips_with_weather.parquet` — analisis & ML dengan cuaca (perbandingan)
+> - `taxi_zones.geojson` — untuk peta geospasial
 
 ---
 
@@ -101,6 +112,19 @@ data/
 | `dropoff_zone` | VARCHAR | Nama zona tujuan |
 | `dropoff_borough` | VARCHAR | Borough tujuan |
 
+## Kolom Tambahan di fact_trips_with_weather.parquet
+
+Semua kolom di atas, ditambah:
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `temperature_2m` | DOUBLE | Suhu udara aktual (°C) |
+| `apparent_temperature` | DOUBLE | **Suhu terasa / feels-like (°C)** |
+| `precipitation` | DOUBLE | Curah hujan (mm) |
+| `snowfall` | DOUBLE | Salju (cm) |
+| `windspeed_10m` | DOUBLE | Kecepatan angin (km/h) |
+| `weather_category` | VARCHAR | **snow / heavy_rain / light_rain / freezing / clear** |
+
 ---
 
 ## Anomali yang Ditangani
@@ -126,8 +150,9 @@ data/
 
 Jika ingin menjalankan ulang dari awal (misal ada update data):
 ```bash
-# Hapus file raw TLC (akan didownload ulang otomatis)
+# Hapus file raw TLC dan weather (akan didownload ulang otomatis)
 del data\raw\tlc\*.parquet
+del data\raw\weather\*.parquet
 
 # Hapus intermediate (akan dibuat ulang)
 del data\intermediate\*.parquet
@@ -163,8 +188,9 @@ Peta `explore_map.html` menampilkan:
 
 ## Untuk ML Engineer
 
-Load `fact_trips.parquet` dan gunakan kolom berikut untuk clustering:
+Tersedia dua versi dataset untuk eksperimen clustering:
 
+**Baseline (tanpa cuaca):**
 ```python
 import duckdb
 
@@ -185,7 +211,34 @@ df = duckdb.connect().execute("""
 """).fetchdf()
 ```
 
-Simpan hasil clustering ke: `data/intermediate/fact_trips_clustered.parquet`
+**Dengan cuaca (untuk perbandingan):**
+```python
+df_weather = duckdb.connect().execute("""
+    SELECT
+        trip_id,
+        trip_distance,
+        trip_duration_min,
+        tip_rate_pct,
+        avg_speed_mph,
+        pickup_hour,
+        pickup_location_id,
+        pickup_zone,
+        pickup_borough,
+        CASE WHEN is_rush_hour THEN 1 ELSE 0 END AS is_rush_hour,
+        CASE WHEN is_weekend THEN 1 ELSE 0 END AS is_weekend,
+        temperature_2m,
+        apparent_temperature,
+        precipitation,
+        snowfall,
+        weather_category
+    FROM read_parquet('data/intermediate/fact_trips_with_weather.parquet')
+""").fetchdf()
+```
+
+Simpan hasil clustering ke:
+- `data/intermediate/fact_trips_clustered.parquet` (baseline)
+- `data/intermediate/fact_trips_with_weather_clustered.parquet` (versi cuaca)
+
 (tambahkan kolom `cluster_label` ke dataframe lalu simpan)
 
 ---
@@ -198,9 +251,15 @@ File yang dibutuhkan untuk dashboard Streamlit:
 import duckdb
 import json
 
-# Data utama (gunakan setelah ML selesai)
+# Versi baseline (setelah ML selesai)
 df = duckdb.connect().execute("""
     SELECT * FROM read_parquet('data/intermediate/fact_trips_clustered.parquet')
+    USING SAMPLE 200000
+""").fetchdf()
+
+# Versi dengan cuaca (untuk perbandingan di dashboard)
+df_weather = duckdb.connect().execute("""
+    SELECT * FROM read_parquet('data/intermediate/fact_trips_with_weather_clustered.parquet')
     USING SAMPLE 200000
 """).fetchdf()
 

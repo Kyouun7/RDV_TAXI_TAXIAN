@@ -1,7 +1,7 @@
 # NYC Taxi Customer Behavior Segmentation
 **Kelompok 1 | MK Rekayasa Data dan Visualisasi | Universitas Brawijaya FILKOM**
 
-Analisis pola perilaku penumpang NYC Yellow Taxi (Sept 2025 – Jan 2026) menggunakan clustering dan visualisasi geospatial.
+Analisis pola perilaku penumpang NYC Yellow Taxi (Sept 2025 – Jan 2026) menggunakan clustering dan visualisasi geospatial. Data taxi digabungkan dengan data cuaca historis dari Open-Meteo untuk analisis perbandingan.
 
 ---
 
@@ -27,13 +27,12 @@ pip install -r requirements.txt
 python pipeline.py
 ```
 
-Pipeline otomatis mengambil data dari internet dan menghasilkan file siap pakai. Tidak perlu download manual.
+Pipeline otomatis mengambil data dari internet (TLC + cuaca) dan menghasilkan file siap pakai. Tidak perlu download manual.
 
 **Output utama yang dihasilkan:**
-- `data_engineer/data/intermediate/fact_trips.parquet` — 14.5 juta baris data perjalanan
+- `data_engineer/data/intermediate/fact_trips.parquet` — 14.5 juta baris, taxi only (baseline)
+- `data_engineer/data/intermediate/fact_trips_with_weather.parquet` — 14.5 juta baris, taxi + cuaca (perbandingan)
 - `data_engineer/data/raw/zones/taxi_zones.geojson` — polygon zona NYC untuk peta
-
-Lihat `TODO.md` untuk penjelasan lengkap semua yang sudah dibuat DE.
 
 **Opsional — lihat visualisasi eksplorasi:**
 ```bash
@@ -46,17 +45,25 @@ python explore_map.py    # → explore_map.html (peta interaktif, buka di browse
 
 ## 2. ML Engineer — Clustering
 
-Gunakan `data_engineer/data/intermediate/fact_trips.parquet` sebagai input.
+Tersedia dua versi input untuk eksperimen:
 
-Simpan hasil ke:
-- `data_engineer/data/intermediate/fact_trips_clustered.parquet` (tambahkan kolom `cluster_label`)
-- `data_engineer/data/intermediate/cluster_names.json` (nama deskriptif tiap cluster)
+**Baseline:**
+- Input: `data_engineer/data/intermediate/fact_trips.parquet`
+- Output: `data_engineer/data/intermediate/fact_trips_clustered.parquet`
+
+**Dengan cuaca:**
+- Input: `data_engineer/data/intermediate/fact_trips_with_weather.parquet`
+- Output: `data_engineer/data/intermediate/fact_trips_with_weather_clustered.parquet`
+
+Tambahkan kolom `cluster_label` ke dataframe lalu simpan. Juga simpan nama deskriptif tiap cluster ke `cluster_names.json`.
 
 Fitur yang direkomendasikan untuk clustering:
 ```
 trip_distance, trip_duration_min, tip_rate_pct, avg_speed_mph,
 pickup_hour, is_rush_hour, is_weekend
 ```
+
+Untuk versi cuaca, tambahkan: `temperature_2m`, `apparent_temperature`, `precipitation`, `snowfall`, `weather_category`
 
 ---
 
@@ -69,6 +76,7 @@ streamlit run dashboard/dashboard.py
 
 File yang dibutuhkan:
 - `data_engineer/data/intermediate/fact_trips_clustered.parquet`
+- `data_engineer/data/intermediate/fact_trips_with_weather_clustered.parquet`
 - `data_engineer/data/raw/zones/taxi_zones.geojson`
 - `data_engineer/data/intermediate/dim_zones.parquet`
 

@@ -35,6 +35,7 @@ def blend_data():
             SELECT
                 t.*,
                 w.temperature_2m,
+                w.apparent_temperature,
                 w.precipitation,
                 w.snowfall,
                 w.windspeed_10m,

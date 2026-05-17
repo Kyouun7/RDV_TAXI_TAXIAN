@@ -18,6 +18,7 @@ END_DATE = "2026-01-31"
 
 WEATHER_VARIABLES = [
     "temperature_2m",
+    "apparent_temperature",
     "precipitation",
     "snowfall",
     "windspeed_10m",

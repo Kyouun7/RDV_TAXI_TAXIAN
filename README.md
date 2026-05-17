@@ -46,8 +46,6 @@ python explore_map.py    # → explore_map.html (peta interaktif, buka di browse
 
 ## 2. ML Engineer — Clustering
 
-> Jalankan setelah Data Engineer selesai.
-
 Gunakan `data_engineer/data/intermediate/fact_trips.parquet` sebagai input.
 
 Simpan hasil ke:
@@ -63,8 +61,6 @@ pickup_hour, is_rush_hour, is_weekend
 ---
 
 ## 3. Data Analyst — Dashboard
-
-> Jalankan setelah ML Engineer selesai.
 
 ```bash
 pip install streamlit folium streamlit-folium plotly duckdb

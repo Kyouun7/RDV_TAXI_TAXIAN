@@ -22,9 +22,9 @@ env/
 dist/
 build/
 
-# ── Jupyter ──
-.ipynb_checkpoints/
-*.ipynb
+# # ── Jupyter ──
+# .ipynb_checkpoints/
+# *.ipynb
 
 # ── OS ──
 .DS_Store

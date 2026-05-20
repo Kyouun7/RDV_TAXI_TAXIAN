@@ -4,7 +4,7 @@ import streamlit as st
 
 from components.charts import hourly_mobility_chart, rush_comparison_chart
 from queries.temporal_queries import get_hourly_mobility_trends, get_rush_hour_behavior_comparison
-from utils.insights import peak_hour_sentence, rush_behavior_sentence
+from utils.insights import hourly_spread_sentence, peak_hour_sentence, rush_behavior_sentence
 
 
 def render(filters: dict):
@@ -22,6 +22,9 @@ def render(filters: dict):
 
     st.markdown("**Catatan singkat:**")
     st.info(peak_hour_sentence(hourly_df))
+    spread_note = hourly_spread_sentence(hourly_df)
+    if spread_note:
+        st.info(spread_note)
     st.info(rush_behavior_sentence(rush_df))
 
     st.divider()

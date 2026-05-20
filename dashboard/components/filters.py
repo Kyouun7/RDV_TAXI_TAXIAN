@@ -12,12 +12,14 @@ from config import (
     DEFAULT_WEEKEND_MODE,
     DEFAULT_WEATHER_SELECTION,
     MAP_MODE_DESCRIPTIONS,
+    SEGMENT_DISPLAY_NAMES,
 )
 from utils.data_loader import (
     active_behavior_fact_path,
     cluster_file_available,
     get_borough_options,
     get_day_of_week_options,
+    get_segment_options,
     get_weather_options,
 )
 
@@ -35,6 +37,7 @@ def render_sidebar_filters() -> dict:
     st.sidebar.page_link("pages/03_Analisis_Perilaku_Temporal.py", label="Analisis Perilaku Temporal")
     st.sidebar.page_link("pages/04_Analisis_Cuaca_dan_Perilaku.py", label="Analisis Cuaca dan Perilaku")
     st.sidebar.page_link("pages/05_Segmentasi_Perilaku.py", label="Segmentasi Perilaku")
+    st.sidebar.page_link("pages/06_Segmentasi_Sensitivitas_Cuaca.py", label="Segmentasi Sensitivitas Cuaca")
 
     st.sidebar.markdown("---")
     st.sidebar.header("Filter Perilaku")
@@ -107,6 +110,11 @@ def render_sidebar_filters() -> dict:
     if not weather_categories:
         weather_categories = ["All"]
 
+    st.sidebar.subheader("Catatan Segmentasi")
+    st.sidebar.caption(
+        "Filter segmentasi hanya tersedia di halaman segmentasi agar tidak menimbulkan persepsi filter global."
+    )
+
     st.sidebar.markdown("---")
     st.sidebar.subheader("Eksperimen Peta")
     map_interaction_mode = st.sidebar.selectbox(
@@ -137,17 +145,7 @@ def render_sidebar_filters() -> dict:
     st.sidebar.subheader("Debug & Performa")
     st.sidebar.checkbox("Tampilkan timing kueri", key="debug_perf_mode")
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Lapisan Segmentasi (kedepan)")
-    st.sidebar.selectbox(
-        "Segmen pelanggan",
-        options=["Semua segmen", "Segmen A", "Segmen B", "Segmen C"],
-        index=0,
-        disabled=not cluster_ready,
-        help="Cadangan untuk integrasi `cluster_label` di fase berikutnya.",
-    )
-    if not cluster_ready:
-        st.sidebar.caption("Output cluster belum tersedia. Filter segmentasi disimpan untuk integrasi berikutnya.")
+    # (Removed legacy placeholder control)
 
     return {
         "boroughs": boroughs,

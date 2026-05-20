@@ -14,6 +14,7 @@ FACT_TRIPS_WEATHER_PATH = INTERMEDIATE_DIR / "fact_trips_with_weather.parquet"
 DIM_ZONES_PATH = INTERMEDIATE_DIR / "dim_zones.parquet"
 TAXI_ZONES_GEOJSON_PATH = RAW_ZONES_DIR / "taxi_zones.geojson"
 
+SEGMENTED_TRIPS_PATH = INTERMEDIATE_DIR / "segmented_trips_final.parquet"
 FACT_TRIPS_CLUSTERED_PATH = INTERMEDIATE_DIR / "fact_trips_clustered.parquet"
 FACT_TRIPS_WEATHER_CLUSTERED_PATH = INTERMEDIATE_DIR / "fact_trips_with_weather_clustered.parquet"
 
@@ -51,9 +52,16 @@ MAP_CENTER = [40.7549, -73.9840]
 MAP_ZOOM = 10
 MAP_TILE = "CartoDB positron"
 
+SEGMENT_DISPLAY_NAMES = {
+	"Short Daily Commute": "Mobilitas Jarak Jauh",
+	"Mid-Range Travel": "Perjalanan Urban Bernilai Tinggi",
+	"Long-Distance / Airport": "Mobilitas Urban Menengah",
+}
+
 # Optional soft analytical palette (mint / teal family). Keep subtle and accessible.
 SOFT_PALETTE = {
 	"accent": "#074051",  # soft teal
 	"accent_soft": "#1EC9CF",
 	"choropleth_scale": ["#d3f2a4", "#8dda94", "#5fb288", "#31877c", "#136068"],
 }
+

@@ -11,6 +11,7 @@ from config import (
     FACT_TRIPS_CLUSTERED_PATH,
     FACT_TRIPS_PATH,
     FACT_TRIPS_WEATHER_PATH,
+    SEGMENTED_TRIPS_PATH,
     TAXI_ZONES_GEOJSON_PATH,
 )
 from utils.cache import cache_data
@@ -34,12 +35,21 @@ def _as_posix(path: Path) -> str:
 
 
 def cluster_file_available() -> bool:
-    return FACT_TRIPS_CLUSTERED_PATH.exists()
+    return SEGMENTED_TRIPS_PATH.exists() or FACT_TRIPS_CLUSTERED_PATH.exists()
 
 
 def active_behavior_fact_path() -> Path:
-    # When clustering becomes available, the app can transparently use the enriched table.
-    return FACT_TRIPS_CLUSTERED_PATH if cluster_file_available() else FACT_TRIPS_PATH
+    # Base dashboard should use the stable, non-segmented fact table.
+    return FACT_TRIPS_PATH
+
+
+def segmented_behavior_fact_path() -> Path:
+    # Segmentation page should use clustered artifacts only.
+    if SEGMENTED_TRIPS_PATH.exists():
+        return SEGMENTED_TRIPS_PATH
+    if FACT_TRIPS_CLUSTERED_PATH.exists():
+        return FACT_TRIPS_CLUSTERED_PATH
+    return FACT_TRIPS_PATH
 
 
 def active_temporal_fact_path() -> Path:
@@ -61,6 +71,7 @@ def build_filter_clause(
     filters: dict[str, Any],
     table_alias: str = "t",
     include_weather: bool = False,
+    include_segment: bool = False,
 ) -> str:
     conditions: list[str] = []
 
@@ -91,6 +102,11 @@ def build_filter_clause(
         if selected_dow:
             dow_list = ", ".join(str(int(d)) for d in selected_dow)
             conditions.append(f"{table_alias}.pickup_day_of_week IN ({dow_list})")
+
+    segment_filter = filters.get("segment_filter", "Semua Segmen")
+    # Segmentation filters are opt-in for segmentation-aware queries only.
+    if include_segment and segment_filter and segment_filter != "Semua Segmen":
+        conditions.append(f"{table_alias}.customer_segment = {sql_literal(str(segment_filter))}")
 
     if include_weather:
         weather_categories = filters.get("weather_categories", ["All"])
@@ -162,3 +178,20 @@ def get_day_of_week_options() -> list[str]:
     canonical = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
     available = [d for d in canonical if d in ordered_labels]
     return ["Semua", *available]
+
+
+@cache_data
+def get_segment_options() -> list[str]:
+    if not cluster_file_available():
+        return ["Semua Segmen"]
+
+    src = _as_posix(segmented_behavior_fact_path())
+    sql = f"""
+        SELECT DISTINCT cluster_id, customer_segment
+        FROM read_parquet('{src}')
+        WHERE cluster_id IS NOT NULL AND customer_segment IS NOT NULL
+        ORDER BY cluster_id
+    """
+    df = run_query(sql)
+    segments = df["customer_segment"].tolist()
+    return ["Semua Segmen", *segments]

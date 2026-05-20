@@ -11,7 +11,7 @@ from queries.spatial_queries import (
     get_zone_tip_behavior,
 )
 from utils.data_loader import load_geojson
-from utils.insights import zone_hotspot_sentence, mobility_inequality_sentence
+from utils.insights import high_tip_anomaly_sentence, mobility_inequality_sentence, zone_hotspot_sentence
 
 
 def render(filters: dict):
@@ -58,7 +58,12 @@ def render(filters: dict):
     if not zone_df.empty:
         st.markdown("**Pengamatan utama:**")
         st.info(zone_hotspot_sentence(zone_df))
-        st.info(mobility_inequality_sentence(zone_df))
+        inequality_note = mobility_inequality_sentence(zone_df)
+        if inequality_note:
+            st.info(inequality_note)
+        tip_anomaly_note = high_tip_anomaly_sentence(tip_df)
+        if tip_anomaly_note:
+            st.info(tip_anomaly_note)
 
     st.divider()
     st.caption("Peta dan tabel dirancang untuk saling melengkapi: hotspot menunjukkan konsentrasi, tabel menunjukkan perilaku rata-rata.")

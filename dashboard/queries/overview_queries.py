@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from config import FACT_TRIPS_PATH
-from utils.data_loader import active_behavior_fact_path, build_filter_clause, run_query
+from utils.data_loader import active_behavior_fact_path, build_filter_clause, cluster_file_available, run_query
 
 
 def get_behavior_kpis(filters: dict):
@@ -45,5 +45,5 @@ def get_borough_mobility_distribution(filters: dict, sort_direction: str = "DESC
 def get_data_source_status() -> dict[str, bool]:
     return {
         "baseline_fact": FACT_TRIPS_PATH.exists(),
-        "cluster_ready": active_behavior_fact_path().name.endswith("clustered.parquet"),
+        "cluster_ready": cluster_file_available(),
     }

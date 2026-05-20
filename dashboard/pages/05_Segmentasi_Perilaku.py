@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from components.filters import render_sidebar_filters
-from page_content.segmentation_placeholder import render
+from page_content.segmentation_analysis import render
 
 
 def main() -> None:

@@ -17,6 +17,7 @@ from utils.insights import (
     weather_sensitive_sentence,
     mobility_inequality_sentence,
     high_tip_anomaly_sentence,
+    volume_tip_contrast_sentence,
 )
 
 
@@ -68,6 +69,7 @@ def render(filters: dict):
         dominant_borough_sentence(borough_df),
         peak_hour_sentence(hourly),
         top_tip_zone_sentence(top_zones_df),
+        volume_tip_contrast_sentence(zone_df),
     ]
     if weather is not None:
         insights.append(weather_sensitive_sentence(weather))
@@ -78,7 +80,7 @@ def render(filters: dict):
 
     st.subheader("Interpretasi Singkat")
     st.caption("Ringkasan berikut menafsirkan hasil agregasi, bukan menarik kesimpulan kausal yang berlebihan.")
-    for note in insights:
+    for note in filter(None, insights):
         st.info(note)
 
     st.divider()

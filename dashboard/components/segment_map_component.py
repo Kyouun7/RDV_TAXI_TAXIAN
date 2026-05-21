@@ -67,7 +67,7 @@ def render_segment_cluster_map(
     st.session_state.setdefault("segment_map_zoom", MAP_ZOOM)
 
     simplify_start = time.perf_counter()
-    geojson_simplified = simplify_geojson_precision(geojson, precision=5)
+    geojson_simplified = simplify_geojson_precision(geojson, precision=3)
     geojson_with_metrics = _enrich_geojson_with_cluster_metrics(geojson_simplified, zone_df)
     payload_ms = int((time.perf_counter() - simplify_start) * 1000)
 
@@ -139,17 +139,20 @@ def render_segment_cluster_map(
         key="segment_cluster_map",
         height=560,
         use_container_width=True,
-        returned_objects=["center", "zoom"],
-        render=True,
+        returned_objects=[],
         debug=False,
     )
     render_ms = int((time.perf_counter() - map_start) * 1000)
 
+    # Hanya update session_state jika nilai BENAR-BENAR berubah
+    # → mencegah rerun loop: session_state write → rerun → map render → write lagi
     if isinstance(map_result, dict):
-        if map_result.get("center"):
-            st.session_state["segment_map_center"] = _normalize_center(map_result["center"])
-        if map_result.get("zoom") is not None:
-            st.session_state["segment_map_zoom"] = map_result["zoom"]
+        new_center = _normalize_center(map_result.get("center"))
+        new_zoom = map_result.get("zoom")
+        if new_center and new_center != st.session_state.get("segment_map_center"):
+            st.session_state["segment_map_center"] = new_center
+        if new_zoom is not None and new_zoom != st.session_state.get("segment_map_zoom"):
+            st.session_state["segment_map_zoom"] = new_zoom
 
     st.session_state["last_segment_map_payload_ms"] = payload_ms
     st.session_state["last_segment_map_render_ms"] = render_ms

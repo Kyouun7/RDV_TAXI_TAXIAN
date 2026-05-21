@@ -112,27 +112,14 @@ def render_behavior_choropleth(
             "fillOpacity": 0.75,
         }
 
-    # Render GeoJSON dengan warna custom
-    folium.GeoJson(
-        geojson_with_metrics,
-        style_function=style_function,
-    ).add_to(m)
-
-    # Tambahkan legend
-    custom_colormap.caption = "Intensitas Pergerakan (Jumlah Perjalanan)"
-    custom_colormap.add_to(m)
-
-    choropleth_duration_ms = int(
-        (time.perf_counter() - choropleth_start) * 1000
-    )
-
-    geojson_start = time.perf_counter()
+    # Konfigurasi interaksi berdasarkan mode
     tooltip = None
     popup = None
     style_weight = 0.3
-    highlight_weight = 1.2
+    highlight_weight = 1.5
     highlight_fill = "#ffffff"
-    returned_objects = ["center", "zoom"]
+    # "Seimbang" & default: returned_objects=[] agar tidak trigger rerun saat pan/zoom
+    returned_objects = []
 
     if mode == "klik detail":
         popup = folium.GeoJsonPopup(
@@ -143,6 +130,7 @@ def render_behavior_choropleth(
             sticky=False,
             parse_html=True,
         )
+        returned_objects = ["last_object_clicked"]
     elif mode == "hover ringan":
         tooltip = folium.GeoJsonTooltip(
             fields=["zone", value_col],
@@ -151,8 +139,6 @@ def render_behavior_choropleth(
             sticky=False,
         )
     elif mode == "pasif":
-        tooltip = None
-        popup = None
         style_weight = 0.2
         highlight_weight = 0.2
         highlight_fill = "transparent"
@@ -173,14 +159,11 @@ def render_behavior_choropleth(
             sticky=False,
         )
 
+    # Render GeoJSON SATU layer (warna + interaksi sekaligus — sebelumnya 2x render = 2x data ke browser)
     folium.GeoJson(
         geojson_with_metrics,
-        name="Zone behavior details",
-        style_function=lambda _x: {
-            "fillColor": "transparent",
-            "color": "#4a4a4a",
-            "weight": style_weight,
-        },
+        name="Zone behavior",
+        style_function=style_function,
         highlight_function=lambda _x: {
             "weight": highlight_weight,
             "fillColor": highlight_fill,
@@ -189,7 +172,15 @@ def render_behavior_choropleth(
         tooltip=tooltip,
         popup=popup,
     ).add_to(m)
-    geojson_duration_ms = int((time.perf_counter() - geojson_start) * 1000)
+
+    # Tambahkan legend
+    custom_colormap.caption = "Intensitas Pergerakan (Jumlah Perjalanan)"
+    custom_colormap.add_to(m)
+
+    choropleth_duration_ms = int(
+        (time.perf_counter() - choropleth_start) * 1000
+    )
+    geojson_duration_ms = 0  # merged into single layer above
 
     st.session_state["last_choropleth_ms"] = choropleth_duration_ms
     st.session_state["last_geojson_overlay_ms"] = geojson_duration_ms
@@ -199,16 +190,19 @@ def render_behavior_choropleth(
         height=560,
         use_container_width=True,
         returned_objects=returned_objects,
-        render=True,
         debug=False,
     )
     map_render_duration_ms = int((time.perf_counter() - map_start) * 1000)
 
-    if mode != "pasif" and isinstance(map_result, dict):
-        if map_result.get("center"):
-            st.session_state["behavior_map_center"] = _normalize_center(map_result["center"])
-        if map_result.get("zoom") is not None:
-            st.session_state["behavior_map_zoom"] = map_result["zoom"]
+    # Hanya update session_state jika nilai BENAR-BENAR berubah
+    # → mencegah rerun loop: session_state write → rerun → map render → write lagi
+    if isinstance(map_result, dict):
+        new_center = _normalize_center(map_result.get("center"))
+        new_zoom = map_result.get("zoom")
+        if new_center and new_center != st.session_state.get("behavior_map_center"):
+            st.session_state["behavior_map_center"] = new_center
+        if new_zoom is not None and new_zoom != st.session_state.get("behavior_map_zoom"):
+            st.session_state["behavior_map_zoom"] = new_zoom
 
     st.session_state["last_map_payload_ms"] = payload_duration_ms
     st.session_state["last_map_render_ms"] = map_render_duration_ms

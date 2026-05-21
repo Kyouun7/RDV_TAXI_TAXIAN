@@ -131,7 +131,7 @@ def run_query(sql: str) -> pd.DataFrame:
 
 
 @cache_data
-def load_geojson(precision: int = 5) -> dict[str, Any]:
+def load_geojson(precision: int = 3) -> dict[str, Any]:
     with TAXI_ZONES_GEOJSON_PATH.open(encoding="utf-8") as handle:
         return simplify_geojson_precision(json.load(handle), precision=precision)
 
